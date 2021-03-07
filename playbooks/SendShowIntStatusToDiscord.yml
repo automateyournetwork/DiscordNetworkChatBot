@@ -1,0 +1,49 @@
+---
+
+- hosts: CampusCore
+  vars_prompt:
+    - name: IOS_User_Prompt
+      prompt: "Enter Cisco IOS Username"
+      private: no 
+    - name: IOS_Password_Prompt
+      prompt: "Enter IOS Password"
+      private: yes      
+  tasks:
+# Register Username and Password #
+    - set_fact:   
+        ios_user: "{{ IOS_User_Prompt }}"     
+        ios_password: "{{ IOS_Password_Prompt }}"
+      no_log: true
+      delegate_to: localhost
+      run_once: true   
+
+# Gather Show Interfaces Status #
+    - name: show interfaces status
+      ios_command:
+        commands:
+          - show interfaces status
+      register: int_status_raw
+
+# Genie Parse Raw response #
+    - name: Set Fact Genie Filter 
+      set_fact:
+        pyatsint_status_raw: "{{ int_status_raw['stdout'][0] | parse_genie(command='show interfaces status', os='ios') }}"
+
+# Send to Discord #      
+    - name: Send Show Interface Status (DOWN/DOWN) to Discord Channel
+      uri:
+        url: "https://discord.com/api/webhooks/{{ Your Discord Webhooks URL Here }}"
+        method: POST
+        body_format: json
+        status_code: 204
+        return_content: no
+        validate_certs: no
+        body:
+          username: Your Username Here
+          content: The Network Has An Alert For You from the Show Interface Status Command on the Core
+          embeds:
+            - title: The following interface is DOWN / DOWN 
+            - description: "{{ item.key }} is {{ item.value.status }}"
+      delegate_to: localhost      
+      loop: "{{ pyatsint_status_raw.interfaces | dict2items }}"
+      when: item.value.status == "notconnect"

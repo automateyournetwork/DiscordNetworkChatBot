@@ -1,0 +1,41 @@
+---
+
+- hosts: CampusCore
+  vars_prompt:
+    - name: IOS_User_Prompt
+      prompt: "Enter Cisco IOS Username"
+      private: no 
+    - name: IOS_Password_Prompt
+      prompt: "Enter IOS Password"
+      private: yes      
+  tasks:
+# Register Username and Password #
+    - set_fact:   
+        ios_user: "{{ IOS_User_Prompt }}"     
+        ios_password: "{{ IOS_Password_Prompt }}"
+      no_log: true
+      delegate_to: localhost
+      run_once: true   
+
+# Gather Ansible Facts About Core #
+    - name: Gather Ansible Facts About Core
+      ios_facts:
+        gather_subset:
+          - all
+
+# Send to Discord #      
+    - name: Send Core Version to Discord Channel
+      uri:
+        url: "https://discord.com/api/webhooks/{{ Your Discord Webhooks URL Here }}"
+        method: POST
+        body_format: json
+        status_code: 204
+        return_content: no
+        validate_certs: no
+        body:
+          username: Your Username Here 
+          content: Alert from the Network - This is the IOS version running on your Core
+          embeds:
+            - title: Core Show Version
+            - description: Your Core is running "{{ ansible_facts['net_version'] }}"
+      delegate_to: localhost
